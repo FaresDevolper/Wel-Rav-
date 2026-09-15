@@ -31,8 +31,11 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # معجم لتخزين الدعوات لكل سيرفر لكي نتعرف على الداعي عند انضمام عضو جديد
 invites_cache = {}
 
-# ضع ايدي روم الترحيب هنا (قم بتغيير الرقم إلى ID روم الترحيب الخاصة بك)
+# ضع ايدي روم الترحيب هنا
 WELCOME_CHANNEL_ID = 1425593925414162663  
+
+# رابط صورة الترحيب
+WELCOME_IMAGE_URL = "https://cdn.discordapp.com/attachments/1339684080224174141/1549464675647754341/Gemini_Generated_Image_p1i06up1i06up1i0.jpe?ex=6aaacaee&is=6aa9796e&hm=db15f189270f848f5170d1f11ce0c9ef13fb2c734f5b34ac78d912dc38971204"
 
 async def update_invites_cache():
     """تحديث كاش الدعوات لجميع السيرفرات"""
@@ -90,15 +93,23 @@ async def on_member_join(member):
     if channel:
         inviter_text = inviter.mention if inviter else "غير معروف / رابط خاص"
         
-        # رسالة الترحيب بالتنسيق المطابق للصورة تماماً
-        welcome_message = (
+        # رسالة الترحيب بالتنسيق المطلوب
+        welcome_description = (
             f"| - **Welcome To Rav**\n\n"
             f"| - **Member** : {member.mention}\n\n"
             f"| - **Server Member** : {guild.member_count}\n\n"
             f"| - **Invited by** : {inviter_text}"
         )
         
-        await channel.send(welcome_message)
+        # إنشاء الـ Embed وتضمين الصورة بداخله في رسالة واحدة
+        embed = discord.Embed(
+            description=welcome_description,
+            color=discord.Color.blue()  # يمكنك تغيير اللون حسب رغبتك
+        )
+        embed.set_image(url=WELCOME_IMAGE_URL)
+        
+        # إرسال المنشن النصي مع الـ Embed لضمان وصول التنبيه للعضو
+        await channel.send(content=member.mention, embed=embed)
 
 # تشغيل الـ Web Server للاستضافة
 keep_alive()
