@@ -1,1 +1,108 @@
+import os
+import threading
+import discord
+from discord.ext import commands
+from flask import Flask
 
+# --- سيرفر Flask لضمان استمرار عمل البوت على Render ---
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Bot is alive and running!"
+
+def run_flask():
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=port)
+
+def keep_alive():
+    t = threading.Thread(target=run_flask)
+    t.daemon = True
+    t.start()
+
+# --- إعدادات البوت والـ Intents ---
+intents = discord.Intents.default()
+intents.members = True
+intents.invites = True
+intents.message_content = True
+
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+# معجم لتخزين الدعوات لكل سيرفر لكي نتعرف على الداعي عند انضمام عضو جديد
+invites_cache = {}
+
+# ضع ايدي روم الترحيب هنا (قم بتغيير الرقم إلى ID روم الترحيب الخاصة بك)
+WELCOME_CHANNEL_ID = 1425593925414162663  
+
+async def update_invites_cache():
+    """تحديث كاش الدعوات لجميع السيرفرات"""
+    for guild in bot.guilds:
+        try:
+            invites = await guild.invites()
+            invites_cache[guild.id] = {invite.code: invite.uses for invite.code in invites}
+        except discord.Forbidden:
+            print(f"لا توجد صلاحية Manage Server لقراءة الدعوات في السيرفر: {guild.name}")
+        except Exception as e:
+            print(f"خطأ أثناء كاش الدعوات: {e}")
+
+@bot.event
+async def on_ready():
+    print(f' تم تسجيل الدخول بنجاح باسم: {bot.user.name}')
+    await update_invites_cache()
+
+@bot.event
+async def on_invite_create(invite):
+    """تحديث الكاش عند إنشاء دعوة جديدة"""
+    if invite.guild.id not in invites_cache:
+        invites_cache[invite.guild.id] = {}
+    invites_cache[invite.guild.id][invite.code] = invite.uses
+
+@bot.event
+async def on_invite_delete(invite):
+    """تحديث الكاش عند حذف دعوة"""
+    if invite.guild.id in invites_cache:
+        invites_cache[invite.guild.id].pop(invite.code, None)
+
+@bot.event
+async def on_member_join(member):
+    guild = member.guild
+    inviter = None
+
+    # البحث عن الرابط الذي زاد عدد استخدامه لتحديد الشخص الذي دعا العضو
+    try:
+        current_invites = await guild.invites()
+        old_invites = invites_cache.get(guild.id, {})
+
+        for invite in current_invites:
+            old_uses = old_invites.get(invite.code, 0)
+            if invite.uses > old_uses:
+                inviter = invite.inviter
+                old_invites[invite.code] = invite.uses
+                break
+        
+        # تحديث الكاش بالكامل لضمان الدقة
+        invites_cache[guild.id] = {inv.code: inv.uses for inv in current_invites}
+    except Exception as e:
+        print(f"تعذر تحديد الداعي: {e}")
+
+    # تحديد روم الترحيب
+    channel = bot.get_channel(WELCOME_CHANNEL_ID)
+    if channel:
+        inviter_text = inviter.mention if inviter else "غير معروف / رابط خاص"
+        
+        # رسالة الترحيب بالتنسيق المطابق للصورة تماماً
+        welcome_message = (
+            f"| - **Welcome To Rav**\n\n"
+            f"| - **Member** : {member.mention}\n\n"
+            f"| - **Server Member** : {guild.member_count}\n\n"
+            f"| - **Invited by** : {inviter_text}"
+        )
+        
+        await channel.send(welcome_message)
+
+# تشغيل الـ Web Server للاستضافة
+keep_alive()
+
+# تشغيل البوت (ضع التوكن الخاص بك هنا أو في Environment Variables باسم DISCORD_TOKEN)
+TOKEN = os.environ.get("DISCORD_TOKEN", "YOUR_BOT_TOKEN_HERE")
+bot.run(TOKEN)
