@@ -1,145 +1,144 @@
-from PIL import Image, ImageDraw, ImageFont, ImageChops
-import requests
 import io
+import os
+import threading
+import aiohttp
+import discord
+from discord.ext import commands
+from flask import Flask
 
-# دالة لتحميل الصورة من رابط
-def load_image_from_url(url):
-    response = requests.get(url)
-    img = Image.open(io.BytesIO(response.content))
-    return img
-
-# دالة لعمل قناع دائري (circular mask)
-def make_circular_mask(size):
-    mask = Image.new('L', size, 0)
-    draw = ImageDraw.Draw(mask)
-    draw.ellipse((0, 0) + size, fill=255)
-    return mask
-
-# --- إعدادات النص والأحجام ---
-font_path = "path/to/your/font.ttf" # استبدله بمسار خط يدعم العربية، أو خط افتراضي
-large_font_size = 36 # حجم خط أكبر لاسم المستخدم
-small_font_size = 18 # حجم خط أصغر للنصوص الأخرى
-font_color = (255, 255, 255) # أبيض
-mention_color = (114, 137, 218) # لون الإشارة الافتراضي في ديسكورد
-
-# خلفية الصورة (أسود بالكامل)
-background_color = (0, 0, 0) # أسود خالص
-image_size = (1000, 600) # حجم خلفية الترحيب
-
-# --- روابط الصور (استبدلها بروابطك الفعلية) ---
-user_avatar_url = "IMAGE_URL_OF_NEW_USER_AVATAR"
-server_logo_url = "IMAGE_URL_OF_YOUR_SERVER_LOGO_IMAGE" # رابط الصورة التي بداخلها الشعار
-
-# --- متغيرات نصية (للتجربة) ---
-user_mention_text = "@74"
-server_name = "Rav"
-total_members = 254
-inviter_mention = "@Fros #11"
-time_text = "11:24 PM"
-
-# --- البدء في المعالجة ---
-
-# 1. إنشاء خلفية الترحيب السوداء
-base_image = Image.new('RGB', image_size, color=background_color)
-draw = ImageDraw.Draw(base_image)
-
-# تحميل الخطوط
-try:
-    large_font = ImageFont.truetype(font_path, large_font_size)
-    small_font = ImageFont.truetype(font_path, small_font_size)
-except IOError:
-    # في حال لم يجد الخط، استخدم خطاً افتراضياً
-    print(f"فشل تحميل الخط من {font_path}، استخدام خط افتراضي.")
-    large_font = ImageFont.load_default()
-    small_font = ImageFont.load_default()
-
-# 2. إضافة النص في الزاوية العلوية اليسرى
-# ملاحظة: Pillow يرسم من اليسار إلى اليمين. قد تحتاج لتعديل المواقع للخط العربي.
-current_y = 30
-margin_left = 30
-
-draw.text((margin_left, current_y), "APP", font=small_font, fill=font_color)
-draw.text((margin_left + 150, current_y), time_text, font=small_font, fill=font_color)
-current_y += 40
-
-# النص: "Welcome To Rav Server" (مع تلوين Rav)
-draw.text((margin_left, current_y), "Welcome To ", font=small_font, fill=font_color)
-current_x = margin_left + draw.textsize("Welcome To ", font=small_font)[0]
-draw.text((current_x, current_y), server_name, font=small_font, fill=font_color) # Rav بنفس اللون
-# لإعطاء Rav لون مختلف: draw.text((current_x, current_y), server_name, font=small_font, fill=mention_color)
-draw.text((current_x + draw.textsize(server_name, font=small_font)[0], current_y), " Server", font=small_font, fill=font_color)
-current_y += 40
-
-# النص: "Member: @74" (مع تكبير وحجم أكبر)
-draw.text((margin_left, current_y), "Member : ", font=small_font, fill=font_color)
-current_x = margin_left + draw.textsize("Member : ", font=small_font)[0]
-draw.text((current_x, current_y), user_mention_text, font=large_font, fill=mention_color) # تكبير اسم المستخدم وتلوينه
-current_y += 60 # مسافة أكبر بعد اسم المستخدم الكبير
-
-# النص: "erver Member : 254"
-# لاحظ الكلمة الأولى "erver" هي كما في الصورة، يمكنك تصحيحها هنا إلى "Server" إذا أردت.
-draw.text((margin_left, current_y), f"server Member : {total_members}", font=small_font, fill=font_color)
-current_y += 40
-
-# النص: "Invited by: @Fros #11" (مع تلوين الإشارة)
-draw.text((margin_left, current_y), "Invited by : ", font=small_font, fill=font_color)
-current_x = margin_left + draw.textsize("Invited by : ", font=small_font)[0]
-draw.text((current_x, current_y), inviter_mention, font=small_font, fill=mention_color) # تلوين الإشارة
-
-# 3. تحميل الشعار وفصله عن خلفيته البنفسجية
-print("تحميل الشعار...")
-full_logo_img = load_image_from_url(server_logo_url).convert("RGBA")
-# (اختياري) إذا كان الشعار كبيراً جداً، قم بتصغيره أولاً
-full_logo_img.thumbnail((400, 400), Image.ANTIALIAS)
-
-# عزل الشعار (طريقة Chroma Key مبسطة):
-# سنبحث عن اللون البنفسجي (الخلفية) ونجعله شفافاً.
-# هذه الطريقة تعمل بشكل جيد مع الخلفيات ذات اللون الواحد تقريباً.
-print("عزل الشعار عن الخلفية البنفسجية...")
-data = full_logo_img.getdata()
-new_data = []
-# نطاق اللون البنفسجي للبحث (قد تحتاج لتعديله)
-for item in data:
-    # item is (r, g, b, a)
-    # البحث عن الألوان ذات اللون الأزرق العالي والأحمر المتوسط والمنخفض الأخضر (بنفسجي)
-    if item[2] > 100 and item[0] < 150 and item[1] < 150:
-        new_data.append((0, 0, 0, 0)) # شفاف بالكامل
-    else:
-        new_data.append(item)
-full_logo_img.putdata(new_data)
-
-# الآن الشعار معزول.
-
-# 4. دمج الشعار المعزول في منتصف الخلفية السوداء
-logo_x = (image_size[0] - full_logo_img.size[0]) // 2
-logo_y = (image_size[1] - full_logo_img.size[1]) // 2
-# الشعار المعزول يتم لصقه باستخدام نفسه كقناع شفاف
-base_image.paste(full_logo_img, (logo_x, logo_y), full_logo_img)
+# --- سيرفر Flask لضمان استمرار عمل البوت على Render ---
+app = Flask("")
 
 
-# 5. تحميل صورة المستخدم وتحريكها للأسفل واليمين
-print("تحميل صورة المستخدم...")
-user_avatar_img = load_image_from_url(user_avatar_url).convert("RGBA")
+@app.route("/")
+def home():
+  return "Bot is alive and running!"
 
-# تكبير صورة المستخدم (على سبيل المثال، إلى 1.5 مرة)
-user_avatar_img = user_avatar_img.resize((150, 150), Image.ANTIALIAS) # تكبير الحجم
 
-# تحريكها إلى أسفل يمين الشعار
-user_avatar_x_pos = logo_x + int(full_logo_img.size[0] * 0.7) # حرك يمين الشعار
-user_avatar_y_pos = logo_y + int(full_logo_img.size[1] * 0.6) # حرك أسفل الشعار
+def run_flask():
+  port = int(os.environ.get("PORT", 8080))
+  app.run(host="0.0.0.0", port=port)
 
-# عمل قناع دائري لصورة المستخدم
-avatar_mask = make_circular_mask(user_avatar_img.size)
-user_avatar_img.putalpha(avatar_mask)
 
-# دمج صورة المستخدم في موقعها الجديد
-base_image.paste(user_avatar_img, (user_avatar_x_pos, user_avatar_y_pos), user_avatar_img)
+def keep_alive():
+  t = threading.Thread(target=run_flask)
+  t.daemon = True
+  t.start()
 
-# --- حفظ وإرسال الصورة ---
-# يمكنك حفظها في ملف أو إرسالها مباشرة كـ BytesIO
-print("حفظ الصورة النهائية...")
-output_image_path = "welcome_final.png"
-base_image.save(output_image_path)
-print(f"تم حفظ الصورة بنجاح باسم {output_image_path}")
 
-# base_image.show() # لعرض الصورة محلياً
+# --- إعدادات البوت والـ Intents ---
+intents = discord.Intents.default()
+intents.members = True
+intents.invites = True
+intents.message_content = True
+
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+# معجم لتخزين الدعوات لكل سيرفر لكي نتعرف على الداعي عند انضمام عضو جديد
+invites_cache = {}
+
+# ضع ايدي روم الترحيب هنا
+WELCOME_CHANNEL_ID = 1425593925414162663
+
+# رابط صورة الترحيب
+WELCOME_IMAGE_URL = "https://cdn.discordapp.com/attachments/1339684080224174141/1549874904080580648/IMG_9116.jpg?ex=6aac48fc&is=6aaaf77c&hm=41f918fb211d875e421b483beceab7537102a36ff8fcad7d1ab7cc84a1f06302"
+
+async def update_invites_cache():
+  """تحديث كاش الدعوات لجميع السيرفرات"""
+  for guild in bot.guilds:
+    try:
+      invites = await guild.invites()
+      invites_cache[guild.id] = {
+          invite.code: invite.uses for invite.code in invites
+      }
+    except discord.Forbidden:
+      print(
+          "لا توجد صلاحية Manage Server لقراءة الدعوات في السيرفر:"
+          f" {guild.name}"
+      )
+    except Exception as e:
+      print(f"خطأ أثناء كاش الدعوات: {e}")
+
+
+@bot.event
+async def on_ready():
+  print(f" تم تسجيل الدخول بنجاح باسم: {bot.user.name}")
+  await update_invites_cache()
+
+
+@bot.event
+async def on_invite_create(invite):
+  """تحديث الكاش عند إنشاء دعوة جديدة"""
+  if invite.guild.id not in invites_cache:
+    invites_cache[invite.guild.id] = {}
+  invites_cache[invite.guild.id][invite.code] = invite.uses
+
+
+@bot.event
+async def on_invite_delete(invite):
+  """تحديث الكاش عند حذف دعوة"""
+  if invite.guild.id in invites_cache:
+    invites_cache[invite.guild.id].pop(invite.code, None)
+
+
+@bot.event
+async def on_member_join(member):
+  guild = member.guild
+  inviter = None
+
+  # البحث عن الرابط الذي زاد عدد استخدامه لتحديد الشخص الذي دعا العضو
+  try:
+    current_invites = await guild.invites()
+    old_invites = invites_cache.get(guild.id, {})
+
+    for invite in current_invites:
+      old_uses = old_invites.get(invite.code, 0)
+      if invite.uses > old_uses:
+        inviter = invite.inviter
+        old_invites[invite.code] = invite.uses
+        break
+
+    # تحديث الكاش بالكامل لضمان الدقة
+    invites_cache[guild.id] = {inv.code: inv.uses for inv in current_invites}
+  except Exception as e:
+    print(f"تعذر تحديد الداعي: {e}")
+
+  # تحديد روم الترحيب
+  channel = bot.get_channel(WELCOME_CHANNEL_ID)
+  if channel:
+    inviter_text = inviter.mention if inviter else "غير معروف / رابط خاص"
+
+    # رسالة الترحيب كـ Plain Text متناسق وبدون تكرار المنشن
+    welcome_text = (
+        f"| - **Welcome To Rav**\n\n"
+        f"| - **Member** : {member.mention}\n\n"
+        f"| - **Server Member** : {guild.member_count}\n\n"
+        f"| - **Invited by** : {inviter_text}"
+    )
+
+    # جلب الصورة من الرابط لإرسالها كمرفق مباشر (Attachment) بدلاً من Embed
+    try:
+      async with aiohttp.ClientSession() as session:
+        async with session.get(WELCOME_IMAGE_URL) as resp:
+          if resp.status == 200:
+            image_data = await resp.read()
+            file = discord.File(
+                fp=io.BytesIO(image_data), filename="welcome.png"
+            )
+
+            # إرسال الرسالة النصية مع ملف الصورة المرفق
+            await channel.send(content=welcome_text, file=file)
+          else:
+            # في حال تعذر جلب الصورة، يتم إرسال النص فقط
+            await channel.send(content=welcome_text)
+    except Exception as e:
+      print(f"خطأ أثناء إرسال صورة الترحيب: {e}")
+      await channel.send(content=welcome_text)
+
+
+# تشغيل الـ Web Server للاستضافة
+keep_alive()
+
+# تشغيل البوت (ضع التوكن الخاص بك هنا أو في Environment Variables باسم DISCORD_TOKEN)
+TOKEN = os.environ.get("DISCORD_TOKEN", "YOUR_BOT_TOKEN_HERE")
+bot.run(TOKEN)
