@@ -42,7 +42,7 @@ invites_cache = {}
 WELCOME_CHANNEL_ID = 1425593925414162663
 
 # رابط صورة الترحيب
-WELCOME_IMAGE_URL = "https://cdn.discordapp.com/attachments/1339684080224174141/1549888680557281330/IMG_9115.jpg?ex=6aac55d0&is=6aab0450&hm=358fbab34a0ac9c1f0764a310ef758d5e591b395d36db9e316c576759b21391a"
+WELCOME_IMAGE_URL = "759b21391a"
 
 
 async def update_invites_cache():
