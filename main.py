@@ -39,10 +39,10 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 invites_cache = {}
 
 # ضع ايدي روم الترحيب هنا
-WELCOME_CHANNEL_ID = 1425593925414162663
+WELCOME_CHANNEL_ID = 1556923577637412904
 
 # رابط صورة الترحيب
-WELCOME_IMAGE_URL = "https://cdn.discordapp.com/attachments/1339684080224174141/1549888680557281330/IMG_9115.jpg?ex=6aacfe90&is=6aabad10&hm=37dfad28bc6e9764e829cfed480135552d10ba31133c134f4abba9efc8acb65d"
+WELCOME_IMAGE_URL = "https://cdn.discordapp.com/attachments/1556923577637412904/1556926996544618546/Rav_Avatar_logo.png?backend=b2&ex=6ac5f0c2&is=6ac49f42&hm=dcc0aa10330c287c919e8c562a1feb4008507f4bedcbe6a5b553784e4935c98c&"
 
 
 async def update_invites_cache():
