@@ -170,7 +170,7 @@ async def on_member_join(member):
 
         # رسالة الترحيب كـ Plain Text متناسق وبدون تكرار المنشن
         welcome_text = (
-            f"| - **Welcome To Rav**\n\n"
+            f"| - **Welcome To Rav Avt **\n\n"
             f"| - **Member** : {member.mention}\n\n"
             f"| - **Server Member** : {guild.member_count}\n\n"
             f"| - **Invited by** : {inviter_text}"
